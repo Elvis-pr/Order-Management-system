@@ -21,21 +21,27 @@ Deno.serve(async (request) => {
   if (request.method !== "POST") return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers });
 
   const authorization = request.headers.get("Authorization");
-  if (!authorization?.startsWith("Bearer ")) return new Response(JSON.stringify({ error: "Sign in to invite staff" }), { status: 401, headers });
+  if (!authorization?.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Sign in to invite staff" }), { status: 401, headers });
+  }
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !anonKey || !serviceRoleKey) throw new Error("Supabase function secrets are not configured");
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+      throw new Error("Supabase function secrets are not configured");
+    }
 
     const accessToken = authorization.slice("Bearer ".length);
     const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      global: { headers: { Authorization: authorization } },
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const { data: { user }, error: authError } = await userClient.auth.getUser(accessToken);
-    if (authError || !user) return new Response(JSON.stringify({ error: "Your session is invalid or expired" }), { status: 401, headers });
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Your session is invalid or expired" }), { status: 401, headers });
+    }
 
     const body = await request.json() as {
       businessId?: string;
@@ -66,7 +72,9 @@ Deno.serve(async (request) => {
       .is("branch_id", null)
       .maybeSingle();
     if (inviterError) throw inviterError;
-    if (!inviter) return new Response(JSON.stringify({ error: "Only a business administrator can invite staff" }), { status: 403, headers });
+    if (!inviter) {
+      return new Response(JSON.stringify({ error: "Only a business administrator can invite staff" }), { status: 403, headers });
+    }
 
     if (branchId) {
       const { data: branch, error: branchError } = await adminClient
@@ -77,7 +85,9 @@ Deno.serve(async (request) => {
         .eq("active", true)
         .maybeSingle();
       if (branchError) throw branchError;
-      if (!branch) return new Response(JSON.stringify({ error: "Choose an active branch in this restaurant" }), { status: 400, headers });
+      if (!branch) {
+        return new Response(JSON.stringify({ error: "Choose an active branch in this restaurant" }), { status: 400, headers });
+      }
     }
 
     const { data: invitation, error: invitationError } = await adminClient.auth.admin.inviteUserByEmail(email, {
